@@ -9,14 +9,28 @@ from langgraph.graph import StateGraph
 from agent_pkg.prompts import *
 from agent_pkg.states import *
 import os
+import time
+import subprocess
+import webbrowser
 
-OUTPUT_DIR = "generated_app"
-
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
+OUTPUT_DIR = os.path.join(ROOT_DIR, f"generated_app_{int(time.time())}")
 
 llm = init_chat_model("google_genai:gemini-2.5-flash")
 
 # set_debug(True)
 # set_verbose(True)
+def serve_app(output_dir):
+    # start simple HTTP server
+    process = subprocess.Popen(
+        ["python", "-m", "http.server", "8000"],
+        cwd=output_dir
+    )
+    time.sleep(2)
+    webbrowser.open("http://localhost:8000")
+    print("--> App running at http://localhost:8000")
+    return process
 
 #PLANNER
 def planner_agent(state: dict) -> dict:
@@ -49,26 +63,22 @@ def coder_agent(state: dict) -> dict:
             f.write(code)
 
         print(f"✅ Created: {filepath}")
-
+    serve_app(OUTPUT_DIR)
     return {"status":"done"}
 
-#GRAPH BUILD
-graph = StateGraph(dict)
-graph.add_node("planner",planner_agent)
-graph.add_node("architect",architect_agent)
-graph.add_node("coder", coder_agent)
-graph.set_entry_point("planner")
-graph.add_edge("planner","architect")
-graph.add_edge("architect","coder")
-graph.add_edge("coder",END)
-
-
-agent = graph.compile()
-
-user_prompt = "create me a calculator APP please using html css and js"
-
-result = agent.invoke({"user_prompt":user_prompt})
-print(result)
+def ai_agent(input_prompt):
+    #GRAPH BUILD
+    graph = StateGraph(dict)
+    graph.add_node("planner",planner_agent)
+    graph.add_node("architect",architect_agent)
+    graph.add_node("coder", coder_agent)
+    graph.set_entry_point("planner")
+    graph.add_edge("planner","architect")
+    graph.add_edge("architect","coder")
+    graph.add_edge("coder",END)
+    agent = graph.compile()
+    result = agent.invoke({"user_prompt":input_prompt})
+    print(result)
 
 
 
